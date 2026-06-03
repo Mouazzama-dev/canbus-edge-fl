@@ -51,7 +51,7 @@ def _lazy_load_csv():
     if _GLOBAL_X is not None:
         return
 
-    csv_path = "/home/user/Documents/Masters/Edge Computing/canbus-edge-fl/quickstart-pytorch/canbus_data.csv"
+    csv_path = os.path.join(os.path.dirname(__file__), "..", "canbus_data.csv")
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"⚠️ Please place HCRL dataset as '{csv_path}' in your directory!")
 
