@@ -1,0 +1,60 @@
+{
+  "strategy": "fedadam",
+  "history": [
+    {
+      "round": 0,
+      "accuracy": 0.1918,
+      "loss": 1.567316409945488
+    },
+    {
+      "round": 1,
+      "accuracy": 0.3091,
+      "loss": 1.4930862456560134
+    },
+    {
+      "round": 2,
+      "accuracy": 0.2,
+      "loss": 1.8165436662733554
+    },
+    {
+      "round": 3,
+      "accuracy": 0.2,
+      "loss": 3.3224970179609956
+    },
+    {
+      "round": 4,
+      "accuracy": 0.2,
+      "loss": 5.625732450993382
+    },
+    {
+      "round": 5,
+      "accuracy": 0.2,
+      "loss": 8.224104770866234
+    },
+    {
+      "round": 6,
+      "accuracy": 0.2,
+      "loss": 10.792148956655723
+    },
+    {
+      "round": 7,
+      "accuracy": 0.2,
+      "loss": 13.219052778276431
+    },
+    {
+      "round": 8,
+      "accuracy": 0.2,
+      "loss": 15.361580937332416
+    },
+    {
+      "round": 9,
+      "accuracy": 0.2,
+      "loss": 17.15937484680907
+    },
+    {
+      "round": 10,
+      "accuracy": 0.2,
+      "loss": 18.52518191443523
+    }
+  ]
+}

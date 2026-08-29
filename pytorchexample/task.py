@@ -1,21 +1,28 @@
-"""task.py: Flower / PyTorch app using Real HCRL Car-Hacking Dataset."""
+"""task.py: Flower / PyTorch app for 5-class CAN-bus intrusion detection.
 
+Classes: 0=Normal, 1=DoS, 2=Fuzzy, 3=Gear-spoof, 4=RPM-spoof.
+Data is produced by prepare_data.py (canbus_5class.npz).
+"""
+
+import os
+import gc
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import gc
-import os
-import pandas as pd
-import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+
+NUM_CLASSES = 5
+CLASS_NAMES = ["Normal", "DoS", "Fuzzy", "Gear", "RPM"]
+
 
 # --- 1. LIGHTWEIGHT MLP MODEL FOR EDGE NODES ---
 class Net(nn.Module):
-    """Optimized Tabular MLP for resource-constrained Vehicle Telemetry classification."""
-    def __init__(self, input_dim=10, num_classes=2):
-        super(Net, self).__init__()
+    """Small tabular MLP for resource-constrained CAN-bus classification."""
+
+    def __init__(self, input_dim=10, num_classes=NUM_CLASSES):
+        super().__init__()
         self.fc1 = nn.Linear(input_dim, 32)
         self.fc2 = nn.Linear(32, 16)
         self.fc3 = nn.Linear(16, num_classes)
@@ -26,133 +33,151 @@ class Net(nn.Module):
         return self.fc3(x)
 
 
-# Global variables to cache data allocation safely in system memory
-_GLOBAL_X = None
-_GLOBAL_Y = None
-_INPUT_DIM = 10
-_NUM_CLASSES = 2
-
-# --- Safe Hex to Decimal Parsing Block ---
-def safe_hex_parse(val):
-    """Converts hex strings to integers safely. Returns 0 if invalid or string matches flags like 'R'."""
-    if pd.isnull(val):
-        return 0
-    clean_str = str(val).strip()
-    try:
-        return int(clean_str, 16)
-    except ValueError:
-        # Fallback if character strings like 'R' or 'T' bleed into data payload metrics
-        return 0
+# --- 2. DATA LOADING (cached once per process) ---
+_TRAIN_X = None
+_TRAIN_Y = None
+_TEST = None
 
 
-def _lazy_load_csv():
-    """Helper function to load and preprocess HCRL CSV with error-tolerant parsers."""
-    global _GLOBAL_X, _GLOBAL_Y, _INPUT_DIM, _NUM_CLASSES
-    if _GLOBAL_X is not None:
+def _load_all():
+    """Load the prepared 5-class dataset and carve out a global test set."""
+    global _TRAIN_X, _TRAIN_Y, _TEST
+    if _TRAIN_X is not None:
         return
 
-    csv_path = os.path.join(os.path.dirname(__file__), "..", "canbus_data.csv")
-    if not os.path.exists(csv_path):
-        raise FileNotFoundError(f"⚠️ Please place HCRL dataset as '{csv_path}' in your directory!")
-
-    print(f"📖 Loading real HCRL CAN-Bus data from {csv_path}...")
-    
-    # Mapping complete 12 column layout of Korea University framework
-    col_names = ['Timestamp', 'CAN_ID', 'DLC', 'D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'Label']
-    
-    # 50k rows allocation for maximum stability on 8GB RAM architecture
-    df = pd.read_csv(csv_path, names=col_names, nrows=50000, header=None)
-    
-    # Processing metrics safely via functional map pipelines
-    df['CAN_ID'] = df['CAN_ID'].apply(safe_hex_parse)
-    
-    for col in ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']:
-        df[col] = df[col].apply(safe_hex_parse)
-        
-    # Standardize Labels: 'T' (Attack Payload) -> 1, Anything else ('R' / Normal driving) -> 0
-    df['Label'] = df['Label'].apply(lambda x: 1 if str(x).strip() == 'T' else 0)
-
-    feature_cols = ['CAN_ID', 'DLC', 'D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7']
-    
-    X = df[feature_cols].values.astype(np.float32)
-    y = df['Label'].values.astype(np.int64)
-    
-    # Scale features for neural network stability
-    X = StandardScaler().fit_transform(X)
-    
-    _GLOBAL_X = torch.tensor(X, dtype=torch.float32)
-    _GLOBAL_Y = torch.tensor(y, dtype=torch.int64)
-    _INPUT_DIM = X.shape[1]
-    _NUM_CLASSES = 2
-    print(f"✅ HCRL Data Loaded Successfully. Features: {_INPUT_DIM}, Classes: 2")
-
-
-# --- 2. FLOWER DATA LOAD INTERFACE ---
-def load_data(partition_id: int, num_partitions: int, batch_size: int):
-    """Loads a unique chunk of the preprocessed dataset for a specific SuperNode."""
-    _lazy_load_csv()
-    
-    total_samples = len(_GLOBAL_X)
-    chunk_size = total_samples // num_partitions
-    
-    start_idx = partition_id * chunk_size
-    end_idx = start_idx + chunk_size
-    
-    X_chunk = _GLOBAL_X[start_idx:end_idx]
-    y_chunk = _GLOBAL_Y[start_idx:end_idx]
-    
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_chunk, y_chunk, test_size=0.2, random_state=42
+    # flwr run installs the app to ~/.flwr/apps/..., so __file__ is NOT next to
+    # the data. Use an absolute path (override with CANBUS_NPZ env var if the
+    # project moves to another machine).
+    path = os.environ.get(
+        "CANBUS_NPZ",
+        "/home/user/Documents/Masters/Edge Computing/canbus-edge-fl/quickstart-pytorch/canbus_5class.npz",
     )
-    
-    train_dataset = TensorDataset(X_train, y_train)
-    test_dataset = TensorDataset(X_test, y_test)
-    
-    return DataLoader(train_dataset, batch_size=batch_size, shuffle=True), DataLoader(test_dataset, batch_size=batch_size)
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"{path} not found. Run 'python prepare_data.py' first."
+        )
+
+    data = np.load(path)
+    X = torch.tensor(data["X"], dtype=torch.float32)
+    y = torch.tensor(data["y"], dtype=torch.int64)
+
+    # Hold out a stratified global test set: 2000 rows per class (all 5 classes).
+    # The server uses this to measure the global model on data no client trained on.
+    gen = torch.Generator().manual_seed(42)
+    test_idx, train_idx = [], []
+    for c in range(NUM_CLASSES):
+        idx_c = (y == c).nonzero(as_tuple=True)[0]
+        perm = idx_c[torch.randperm(len(idx_c), generator=gen)]
+        test_idx.append(perm[:2000])
+        train_idx.append(perm[2000:])
+
+    _TEST = (X[torch.cat(test_idx)], y[torch.cat(test_idx)])
+    _TRAIN_X = X[torch.cat(train_idx)]
+    _TRAIN_Y = y[torch.cat(train_idx)]
+
+
+def load_data(partition_id: int, num_partitions: int, batch_size: int):
+    """Non-IID partition: each client sees Normal plus ONE attack type.
+
+    Client 0 -> Normal + DoS, client 1 -> Normal + Fuzzy, and so on. This is a
+    label-skew non-IID setup: the global model must learn all attacks by
+    aggregating clients that each only see one.
+    """
+    _load_all()
+
+    attack_class = 1 + (partition_id % (NUM_CLASSES - 1))  # 1..4
+    normal_idx = (_TRAIN_Y == 0).nonzero(as_tuple=True)[0]
+    normal_share = normal_idx[partition_id::num_partitions]  # split Normal across clients
+    attack_idx = (_TRAIN_Y == attack_class).nonzero(as_tuple=True)[0]
+
+    idx = torch.cat([normal_share, attack_idx])
+    X_c, y_c = _TRAIN_X[idx], _TRAIN_Y[idx]
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_c, y_c, test_size=0.2, random_state=42, stratify=y_c
+    )
+
+    train_ds = TensorDataset(X_train, y_train)
+    test_ds = TensorDataset(X_test, y_test)
+    return (
+        DataLoader(train_ds, batch_size=batch_size, shuffle=True),
+        DataLoader(test_ds, batch_size=batch_size),
+    )
 
 
 def load_centralized_dataset():
-    """Server-side Global Evaluation dataset generator without network leaks."""
-    _lazy_load_csv()
-    # Centralized validation subset tracked directly via ServerApp
-    val_dataset = TensorDataset(_GLOBAL_X[-2000:], _GLOBAL_Y[-2000:])
-    return DataLoader(val_dataset, batch_size=128)
+    """Global test set for server-side evaluation (all 5 classes)."""
+    _load_all()
+    X_test, y_test = _TEST
+    return DataLoader(TensorDataset(X_test, y_test), batch_size=256)
 
 
-# --- 3. OPTIMIZED TRAINING LOOP WITH RAM REFRESH ---
-def train(net, trainloader, epochs, lr, device):
-    """Train the automotive model with explicit execution controls to avoid laptop freezing."""
+# --- 3. TRAIN / TEST LOOPS ---
+# def train(net, trainloader, epochs, lr, device):
+#     """Train the model on one client's local data."""
+#     net.to(device)
+#     criterion = torch.nn.CrossEntropyLoss().to(device)
+#     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+
+#     net.train()
+#     running_loss = 0.0
+#     for _ in range(epochs):
+#         for features, labels in trainloader:
+#             features, labels = features.to(device), labels.to(device)
+#             optimizer.zero_grad()
+#             loss = criterion(net(features), labels)
+#             loss.backward()
+#             optimizer.step()
+#             running_loss += loss.item()
+
+#     gc.collect()
+#     return running_loss / (epochs * len(trainloader))
+def train(net, trainloader, epochs, lr, device, proximal_mu=0.0):
+    """Train on one client's local data.
+
+    If proximal_mu > 0 (FedProx), add a proximal term (mu/2)*||w - w_global||^2
+    that keeps the local model close to the global model received this round.
+    This is what lets FedProx cope with non-IID clients that would otherwise
+    drift too far apart for FedAvg to average sensibly.
+    """
     net.to(device)
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-    
+
+    # Snapshot the global weights (net was just loaded with them) for the term.
+    global_params = [p.detach().clone() for p in net.parameters()]
+
     net.train()
     running_loss = 0.0
     for _ in range(epochs):
-        for images, labels in trainloader:
-            images, labels = images.to(device), labels.to(device)
+        for features, labels in trainloader:
+            features, labels = features.to(device), labels.to(device)
             optimizer.zero_grad()
-            loss = criterion(net(images), labels)
+            loss = criterion(net(features), labels)
+            if proximal_mu > 0.0:
+                prox = 0.0
+                for p, gp in zip(net.parameters(), global_params):
+                    prox = prox + (p - gp).norm(2) ** 2
+                loss = loss + (proximal_mu / 2.0) * prox
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-            
-    # Garbage collection block to maintain low RAM signature
+
     gc.collect()
     return running_loss / (epochs * len(trainloader))
 
-
 def test(net, testloader, device):
-    """Validate vehicular communication security compliance matrix."""
+    """Evaluate the model: returns (average loss, accuracy)."""
     net.to(device)
     criterion = torch.nn.CrossEntropyLoss()
     correct, loss = 0, 0.0
+    net.eval()
     with torch.no_grad():
-        for images, labels in testloader:
-            images, labels = images.to(device), labels.to(device)
-            outputs = net(images)
+        for features, labels in testloader:
+            features, labels = features.to(device), labels.to(device)
+            outputs = net(features)
             loss += criterion(outputs, labels).item()
-            correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
-            
+            correct += (torch.max(outputs, 1)[1] == labels).sum().item()
+
     accuracy = correct / len(testloader.dataset)
     return loss / len(testloader), accuracy
