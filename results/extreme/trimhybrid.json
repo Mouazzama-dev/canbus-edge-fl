@@ -1,0 +1,61 @@
+{
+  "strategy": "trimhybrid",
+  "noise_multiplier": 1.0,
+  "history": [
+    {
+      "round": 0,
+      "accuracy": 0.1399,
+      "loss": 1.6359010368585587
+    },
+    {
+      "round": 1,
+      "accuracy": 0.2631,
+      "loss": 1.5660569727420808
+    },
+    {
+      "round": 2,
+      "accuracy": 0.21,
+      "loss": 1.5445645064115525
+    },
+    {
+      "round": 3,
+      "accuracy": 0.2008,
+      "loss": 1.5842235669493676
+    },
+    {
+      "round": 4,
+      "accuracy": 0.2005,
+      "loss": 1.6547147624194622
+    },
+    {
+      "round": 5,
+      "accuracy": 0.2017,
+      "loss": 1.6943987481296063
+    },
+    {
+      "round": 6,
+      "accuracy": 0.2164,
+      "loss": 1.6571719955652953
+    },
+    {
+      "round": 7,
+      "accuracy": 0.2241,
+      "loss": 1.6852736484259367
+    },
+    {
+      "round": 8,
+      "accuracy": 0.2361,
+      "loss": 1.659059751778841
+    },
+    {
+      "round": 9,
+      "accuracy": 0.2475,
+      "loss": 1.6187001429498196
+    },
+    {
+      "round": 10,
+      "accuracy": 0.4472,
+      "loss": 1.5952615678310393
+    }
+  ]
+}

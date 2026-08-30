@@ -1,0 +1,61 @@
+{
+  "strategy": "filterhybrid",
+  "noise_multiplier": 1.0,
+  "history": [
+    {
+      "round": 0,
+      "accuracy": 0.4,
+      "loss": 1.62551751434803
+    },
+    {
+      "round": 1,
+      "accuracy": 0.4394,
+      "loss": 1.5012743681669236
+    },
+    {
+      "round": 2,
+      "accuracy": 0.772,
+      "loss": 1.2910351529717445
+    },
+    {
+      "round": 3,
+      "accuracy": 0.7878,
+      "loss": 1.0705743551254272
+    },
+    {
+      "round": 4,
+      "accuracy": 0.7899,
+      "loss": 0.9296789765357971
+    },
+    {
+      "round": 5,
+      "accuracy": 0.7918,
+      "loss": 0.8649035464972258
+    },
+    {
+      "round": 6,
+      "accuracy": 0.7919,
+      "loss": 0.8461372647434473
+    },
+    {
+      "round": 7,
+      "accuracy": 0.7931,
+      "loss": 0.8505570601671935
+    },
+    {
+      "round": 8,
+      "accuracy": 0.7945,
+      "loss": 0.8681195430457592
+    },
+    {
+      "round": 9,
+      "accuracy": 0.7956,
+      "loss": 0.893409775570035
+    },
+    {
+      "round": 10,
+      "accuracy": 0.7971,
+      "loss": 0.9216245617717505
+    }
+  ]
+}

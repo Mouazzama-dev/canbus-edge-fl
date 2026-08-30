@@ -1,0 +1,61 @@
+{
+  "strategy": "fedavg",
+  "noise_multiplier": 1.0,
+  "history": [
+    {
+      "round": 0,
+      "accuracy": 0.1399,
+      "loss": 1.6359010368585587
+    },
+    {
+      "round": 1,
+      "accuracy": 0.2,
+      "loss": 8.731006044057176
+    },
+    {
+      "round": 2,
+      "accuracy": 0.2,
+      "loss": 9.946691155021247
+    },
+    {
+      "round": 3,
+      "accuracy": 0.2,
+      "loss": 12.024238120982336
+    },
+    {
+      "round": 4,
+      "accuracy": 0.2,
+      "loss": 11.784923345702277
+    },
+    {
+      "round": 5,
+      "accuracy": 0.2,
+      "loss": 12.904850544116798
+    },
+    {
+      "round": 6,
+      "accuracy": 0.2001,
+      "loss": 11.126265866675922
+    },
+    {
+      "round": 7,
+      "accuracy": 0.2002,
+      "loss": 11.887505817273405
+    },
+    {
+      "round": 8,
+      "accuracy": 0.204,
+      "loss": 10.108138195006386
+    },
+    {
+      "round": 9,
+      "accuracy": 0.2142,
+      "loss": 11.12874914109118
+    },
+    {
+      "round": 10,
+      "accuracy": 0.2164,
+      "loss": 10.559992429469995
+    }
+  ]
+}

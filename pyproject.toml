@@ -41,3 +41,7 @@ dirichlet-alpha = 0.3
 noise-multiplier = 1.0
 clipping-norm = 1.0
 malicious-id = -1
+trim-beta = 0.25
+seed = -1
+norm-factor = 2.0
+run-tag = ""
