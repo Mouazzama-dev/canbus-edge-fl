@@ -74,6 +74,7 @@ def main(grid: Grid, context: Context) -> None:
     partition_mode = context.run_config["partition-mode"]
     noise_multiplier = context.run_config["noise-multiplier"]
     clipping_norm = context.run_config["clipping-norm"]
+    malicious_id = context.run_config["malicious-id"]
 
     global_model = Net()
     arrays = ArrayRecord(global_model.state_dict())
@@ -92,7 +93,11 @@ def main(grid: Grid, context: Context) -> None:
     )
 
     # DP results -> results/dp/ keyed by noise; strategies -> results/<mode>/
-    if strategy_name == "dp":
+        # route results: poison run -> results/poison/, DP -> results/dp/, else results/<mode>/
+    if malicious_id >= 0:
+        out_dir = os.path.join(RESULTS_DIR, "poison")
+        tag = strategy_name
+    elif strategy_name == "dp":
         out_dir = os.path.join(RESULTS_DIR, "dp")
         tag = f"noise_{noise_multiplier}"
     else:

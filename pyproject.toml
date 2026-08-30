@@ -40,3 +40,4 @@ partition-mode = "extreme"
 dirichlet-alpha = 0.3
 noise-multiplier = 1.0
 clipping-norm = 1.0
+malicious-id = -1

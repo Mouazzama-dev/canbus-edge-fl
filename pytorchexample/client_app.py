@@ -20,7 +20,8 @@ def _partition_settings(context):
 
 @app.train()
 def train(msg: Message, context: Context):
-    """Train the model on local data."""
+    """Train the model on local data. A malicious client instead sends a large
+    garbage update (model-poisoning attack)."""
     model = Net()
     model.load_state_dict(msg.content["arrays"].to_torch_state_dict())
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -32,20 +33,27 @@ def train(msg: Message, context: Context):
     mode, alpha = _partition_settings(context)
     trainloader, _ = load_data(partition_id, num_partitions, batch_size, mode, alpha)
 
-    config = msg.content["config"]
-    try:
-        proximal_mu = float(config["proximal-mu"])
-    except KeyError:
-        proximal_mu = 0.0
-
-    train_loss = train_fn(
-        model,
-        trainloader,
-        context.run_config["local-epochs"],
-        config["lr"],
-        device,
-        proximal_mu=proximal_mu,
-    )
+    malicious_id = context.run_config["malicious-id"]
+    if partition_id == malicious_id:
+        # Poisoning: replace the update with large random garbage weights.
+        poisoned = {k: torch.randn_like(v.float()) * 5.0
+                    for k, v in model.state_dict().items()}
+        model.load_state_dict(poisoned)
+        train_loss = 0.0
+    else:
+        config = msg.content["config"]
+        try:
+            proximal_mu = float(config["proximal-mu"])
+        except KeyError:
+            proximal_mu = 0.0
+        train_loss = train_fn(
+            model,
+            trainloader,
+            context.run_config["local-epochs"],
+            config["lr"],
+            device,
+            proximal_mu=proximal_mu,
+        )
 
     model_record = ArrayRecord(model.state_dict())
     metrics = {"train_loss": train_loss, "num-examples": len(trainloader.dataset)}
