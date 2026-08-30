@@ -38,3 +38,5 @@ proximal-mu = 1.0
 server-lr = 0.05
 partition-mode = "extreme"
 dirichlet-alpha = 0.3
+noise-multiplier = 1.0
+clipping-norm = 1.0

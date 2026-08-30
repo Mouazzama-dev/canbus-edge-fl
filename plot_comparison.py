@@ -67,6 +67,8 @@ def main():
     if not regimes:
         raise SystemExit(f"No regime subfolders in {RESULTS_DIR}")
     for regime in sorted(regimes):
+        if regime == "dp":
+            continue
         runs = load_regime(os.path.join(RESULTS_DIR, regime))
         if runs:
             plot_regime(regime, runs)
