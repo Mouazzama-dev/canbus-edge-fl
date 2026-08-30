@@ -36,3 +36,5 @@ save-model = false
 strategy = "fedavg"
 proximal-mu = 1.0
 server-lr = 0.05
+partition-mode = "extreme"
+dirichlet-alpha = 0.3

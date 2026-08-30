@@ -45,24 +45,18 @@ def _load_all():
     if _TRAIN_X is not None:
         return
 
-    # flwr run installs the app to ~/.flwr/apps/..., so __file__ is NOT next to
-    # the data. Use an absolute path (override with CANBUS_NPZ env var if the
-    # project moves to another machine).
     path = os.environ.get(
         "CANBUS_NPZ",
         "/home/user/Documents/Masters/Edge Computing/canbus-edge-fl/quickstart-pytorch/canbus_5class.npz",
     )
     if not os.path.exists(path):
-        raise FileNotFoundError(
-            f"{path} not found. Run 'python prepare_data.py' first."
-        )
+        raise FileNotFoundError(f"{path} not found. Run 'python prepare_data.py' first.")
 
     data = np.load(path)
     X = torch.tensor(data["X"], dtype=torch.float32)
     y = torch.tensor(data["y"], dtype=torch.int64)
 
     # Hold out a stratified global test set: 2000 rows per class (all 5 classes).
-    # The server uses this to measure the global model on data no client trained on.
     gen = torch.Generator().manual_seed(42)
     test_idx, train_idx = [], []
     for c in range(NUM_CLASSES):
@@ -76,26 +70,53 @@ def _load_all():
     _TRAIN_Y = y[torch.cat(train_idx)]
 
 
-def load_data(partition_id: int, num_partitions: int, batch_size: int):
-    """Non-IID partition: each client sees Normal plus ONE attack type.
+def _extreme_indices(partition_id, num_partitions):
+    """Extreme non-IID: client gets Normal + exactly ONE attack type."""
+    attack_class = 1 + (partition_id % (NUM_CLASSES - 1))
+    normal_idx = (_TRAIN_Y == 0).nonzero(as_tuple=True)[0]
+    normal_share = normal_idx[partition_id::num_partitions]
+    attack_idx = (_TRAIN_Y == attack_class).nonzero(as_tuple=True)[0]
+    return torch.cat([normal_share, attack_idx])
 
-    Client 0 -> Normal + DoS, client 1 -> Normal + Fuzzy, and so on. This is a
-    label-skew non-IID setup: the global model must learn all attacks by
-    aggregating clients that each only see one.
+
+def _dirichlet_indices(partition_id, num_partitions, alpha):
+    """Moderate non-IID: split each class across clients via Dirichlet(alpha).
+
+    Uses a fixed seed so every client process computes the same partition and
+    then takes its own slice (deterministic, no overlap, full coverage).
     """
+    rng = np.random.default_rng(1234)
+    parts = [[] for _ in range(num_partitions)]
+    for c in range(NUM_CLASSES):
+        idx_c = (_TRAIN_Y == c).nonzero(as_tuple=True)[0].numpy()
+        rng.shuffle(idx_c)
+        props = rng.dirichlet([alpha] * num_partitions)
+        cuts = (np.cumsum(props) * len(idx_c)).astype(int)[:-1]
+        for i, chunk in enumerate(np.split(idx_c, cuts)):
+            parts[i].append(torch.tensor(chunk, dtype=torch.long))
+    return torch.cat(parts[partition_id])
+
+
+def load_data(partition_id, num_partitions, batch_size, partition_mode="extreme", alpha=0.3):
+    """Return (trainloader, valloader) for one client under the chosen skew."""
     _load_all()
 
-    attack_class = 1 + (partition_id % (NUM_CLASSES - 1))  # 1..4
-    normal_idx = (_TRAIN_Y == 0).nonzero(as_tuple=True)[0]
-    normal_share = normal_idx[partition_id::num_partitions]  # split Normal across clients
-    attack_idx = (_TRAIN_Y == attack_class).nonzero(as_tuple=True)[0]
+    if partition_mode == "dirichlet":
+        idx = _dirichlet_indices(partition_id, num_partitions, alpha)
+    else:
+        idx = _extreme_indices(partition_id, num_partitions)
 
-    idx = torch.cat([normal_share, attack_idx])
     X_c, y_c = _TRAIN_X[idx], _TRAIN_Y[idx]
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_c, y_c, test_size=0.2, random_state=42, stratify=y_c
-    )
+    try:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_c, y_c, test_size=0.2, random_state=42, stratify=y_c
+        )
+    except ValueError:
+        # a class is too small to stratify -> plain split
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_c, y_c, test_size=0.2, random_state=42
+        )
 
     train_ds = TensorDataset(X_train, y_train)
     test_ds = TensorDataset(X_test, y_test)
@@ -113,38 +134,16 @@ def load_centralized_dataset():
 
 
 # --- 3. TRAIN / TEST LOOPS ---
-# def train(net, trainloader, epochs, lr, device):
-#     """Train the model on one client's local data."""
-#     net.to(device)
-#     criterion = torch.nn.CrossEntropyLoss().to(device)
-#     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-
-#     net.train()
-#     running_loss = 0.0
-#     for _ in range(epochs):
-#         for features, labels in trainloader:
-#             features, labels = features.to(device), labels.to(device)
-#             optimizer.zero_grad()
-#             loss = criterion(net(features), labels)
-#             loss.backward()
-#             optimizer.step()
-#             running_loss += loss.item()
-
-#     gc.collect()
-#     return running_loss / (epochs * len(trainloader))
 def train(net, trainloader, epochs, lr, device, proximal_mu=0.0):
     """Train on one client's local data.
 
-    If proximal_mu > 0 (FedProx), add a proximal term (mu/2)*||w - w_global||^2
-    that keeps the local model close to the global model received this round.
-    This is what lets FedProx cope with non-IID clients that would otherwise
-    drift too far apart for FedAvg to average sensibly.
+    If proximal_mu > 0 (FedProx), add (mu/2)*||w - w_global||^2 to keep the
+    local model close to the global model received this round.
     """
     net.to(device)
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 
-    # Snapshot the global weights (net was just loaded with them) for the term.
     global_params = [p.detach().clone() for p in net.parameters()]
 
     net.train()
@@ -165,6 +164,7 @@ def train(net, trainloader, epochs, lr, device, proximal_mu=0.0):
 
     gc.collect()
     return running_loss / (epochs * len(trainloader))
+
 
 def test(net, testloader, device):
     """Evaluate the model: returns (average loss, accuracy)."""

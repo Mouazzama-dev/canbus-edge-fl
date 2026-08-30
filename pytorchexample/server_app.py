@@ -64,6 +64,7 @@ def main(grid: Grid, context: Context) -> None:
     strategy_name = context.run_config["strategy"]
     proximal_mu = context.run_config["proximal-mu"]
     server_lr = context.run_config["server-lr"]
+    partition_mode = context.run_config["partition-mode"]
 
     global_model = Net()
     arrays = ArrayRecord(global_model.state_dict())
@@ -79,8 +80,9 @@ def main(grid: Grid, context: Context) -> None:
     )
 
     # Save per-round history for the comparison plot.
-    os.makedirs(RESULTS_DIR, exist_ok=True)
-    out_path = os.path.join(RESULTS_DIR, f"{strategy_name}.json")
+    out_dir = os.path.join(RESULTS_DIR, partition_mode)
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, f"{strategy_name}.json")
     with open(out_path, "w") as f:
         json.dump({"strategy": strategy_name, "history": HISTORY}, f, indent=2)
     print(f"\nSaved results to {out_path}")
@@ -89,6 +91,7 @@ def main(grid: Grid, context: Context) -> None:
         print("Saving final model to disk...")
         state_dict = result.arrays.to_torch_state_dict()
         torch.save(state_dict, f"final_model_{strategy_name}.pt")
+        partition_mode = context.run_config["partition-mode"]
 
 
 def global_evaluate(server_round: int, arrays: ArrayRecord) -> MetricRecord:
