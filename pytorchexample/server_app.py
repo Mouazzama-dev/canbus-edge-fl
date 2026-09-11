@@ -93,10 +93,11 @@ class FedProxFilterMean(FedAvg):
         for msg in valid_replies:
             sd = msg.content["arrays"].to_torch_state_dict()
             norms.append(torch.cat([v.flatten().float() for v in sd.values()]).norm(2).item())
+        # only keep those with norma median 2x the median norm (or all if none are below that threshold)
         median_norm = float(np.median(norms))
         kept = [msg for msg, n in zip(valid_replies, norms)
                 if n <= self.norm_factor * median_norm] or valid_replies
-
+        #weighted mean of updates - new global model
         reply_contents = [msg.content for msg in kept]
         arrays = aggregate_arrayrecords(reply_contents, self.weighted_by_key)
         metrics = self.train_metrics_aggr_fn(reply_contents, self.weighted_by_key)
@@ -162,6 +163,7 @@ def main(grid: Grid, context: Context) -> None:
 
     if seed >= 0:
         torch.manual_seed(seed)
+    # builds the model 
     global_model = Net()
     arrays = ArrayRecord(global_model.state_dict())
 
@@ -170,7 +172,7 @@ def main(grid: Grid, context: Context) -> None:
         noise_multiplier, clipping_norm, trim_beta, norm_factor
     )
     
-
+    #starts teh federated loop with the given strategy and parameters
     result = strategy.start(
         grid=grid,
         initial_arrays=arrays,

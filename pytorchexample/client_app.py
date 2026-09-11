@@ -17,7 +17,7 @@ def _partition_settings(context):
     alpha = context.run_config["dirichlet-alpha"]
     return mode, alpha
 
-
+#build a fresh Net() and load the global weights that arrived in the message.
 @app.train()
 def train(msg: Message, context: Context):
     """Train the model on local data. A malicious client instead sends a large
@@ -54,11 +54,12 @@ def train(msg: Message, context: Context):
             device,
             proximal_mu=proximal_mu,
         )
-
+    #pack the updated weights into a Message and RETURN it
     model_record = ArrayRecord(model.state_dict())
     metrics = {"train_loss": train_loss, "num-examples": len(trainloader.dataset)}
     metric_record = MetricRecord(metrics)
     content = RecordDict({"arrays": model_record, "metrics": metric_record})
+    # client sends back the updated model and metrics to the server
     return Message(content=content, reply_to=msg)
 
 

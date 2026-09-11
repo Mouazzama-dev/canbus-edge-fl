@@ -1,0 +1,11 @@
+digraph { rankdir=TB; bgcolor="transparent";
+  node[shape=box style="rounded,filled" fontname="Helvetica" fontsize=11 penwidth=1.5];
+  edge[fontname="Helvetica" fontsize=10 color="#555555"];
+  A[label="4 client updates\n(3 honest, maybe 1 malicious)" fillcolor="#E6F1FB" color="#1f77b4"];
+  B[label="compute L2 norm of each update" fillcolor="#E6F1FB" color="#1f77b4"];
+  C[label="norm > 2 x median ?" shape=diamond fillcolor="#FAEEDA" color="#BA7517"];
+  D[label="reject\n(likely poison)" fillcolor="#FCEBEB" color="#A32D2D"];
+  E[label="keep" fillcolor="#EAF3DE" color="#3B6D11"];
+  F[label="weighted MEAN of kept updates\n= new global model" fillcolor="#D9E2F3" color="#1f77b4" penwidth=2];
+  A -> B -> C; C -> D [label="yes"]; C -> E [label="no"]; E -> F; D -> F [style=dashed label="excluded"];
+}

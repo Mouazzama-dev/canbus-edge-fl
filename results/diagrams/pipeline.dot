@@ -1,0 +1,9 @@
+digraph { rankdir=LR; bgcolor="transparent";
+  node[shape=box style="rounded,filled" fillcolor="#E6F1FB" color="#1f77b4" fontname="Helvetica" fontsize=11 penwidth=1.5];
+  edge[color="#555555"];
+  R[label="Raw HCRL files\nDoS, Fuzzy,\ngear, RPM"];
+  P[label="safe hex parse\nbalance 20k/class\nStandardScaler"];
+  N[label="canbus_5class.npz\n100k rows x 10 feats"];
+  Q[label="partition per client\nextreme OR\nDirichlet(a=0.3)"];
+  R -> P -> N -> Q;
+}

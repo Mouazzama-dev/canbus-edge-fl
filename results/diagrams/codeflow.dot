@@ -1,0 +1,26 @@
+digraph {
+  rankdir=TB; bgcolor="transparent";
+  node[fontname="Helvetica" fontsize=12 penwidth=1.6 style="rounded,filled"];
+  edge[fontname="Helvetica" fontsize=10 color="#555555" penwidth=1.4];
+
+  START[label="flwr run\n(submit the job)" shape=box fillcolor="#E7EAF0" color="#5A6B7B"];
+  M[label="server_app.main()\nbuild global model + strategy" fillcolor="#E6F1FB" color="#1E3A5F"];
+  SS[label="strategy.start()  -  run N rounds" fillcolor="#E6F1FB" color="#1E3A5F"];
+
+  subgraph cluster_round {
+    label="ONE ROUND  (repeats N times)"; fontname="Helvetica"; fontsize=13; color="#B4C2D0"; style="rounded"; penwidth=1.6;
+    A1[label="SERVER: send global model + config\nto all clients" fillcolor="#E6F1FB" color="#1E3A5F"];
+    A2[label="CLIENT (x4, in parallel): train()\nload_data + local training\n(epochs, optimizer.step = model fits)" fillcolor="#CDEFE3" color="#0F6E56"];
+    A3[label="CLIENT: return updated weights\nto the server" fillcolor="#CDEFE3" color="#0F6E56"];
+    A4[label="SERVER: aggregate_train()\ncombine the client updates" fillcolor="#E6F1FB" color="#1E3A5F"];
+    A5[label="SERVER: global_evaluate()\ntest accuracy on held-out set" fillcolor="#E6F1FB" color="#1E3A5F"];
+    A6[label="CLIENT: evaluate()\nlocal validation" fillcolor="#CDEFE3" color="#0F6E56"];
+    A1->A2->A3->A4->A5->A6;
+  }
+
+  SAVE[label="save results to JSON\n(+ optional final model)" shape=box fillcolor="#E7EAF0" color="#5A6B7B"];
+
+  START->M->SS->A1;
+  A6->A1 [label="  next round" style=dashed constraint=false color="#00A6A6" fontcolor="#0F6E56"];
+  A6->SAVE [label="after N rounds"];
+}

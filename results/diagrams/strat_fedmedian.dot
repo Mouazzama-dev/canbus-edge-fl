@@ -1,0 +1,5 @@
+digraph{rankdir=TB;bgcolor=transparent;node[fontname=Helvetica fontsize=11 penwidth=1.5];
+U[label="4 client updates" shape=box style="rounded,filled" fillcolor="#E6F1FB" color="#1E3A5F"];
+R[label="coordinate-wise\nMEDIAN (ignores outliers)" shape=box style="rounded,filled" fillcolor="#E6D6CE" color="#1E3A5F" penwidth=2];
+G[label="new global model" shape=box style="rounded,filled" fillcolor="#D9E2F3" color="#1E3A5F"];
+U->R->G;}
